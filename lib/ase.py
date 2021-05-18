@@ -21,6 +21,9 @@ def pile_2_record(row):
 	if ref_read is not np.nan :
 		ref_read_mtx = np.array(re.split(',|:',ref_read)).reshape((-1,3))
 		ref_read_df = pd.DataFrame(ref_read_mtx, columns=['cb','ub','gene']).drop_duplicates()
+		ref_read_df['gene'] = ref_read_df['gene'].str.split('[ ;]')
+		ref_read_df = ref_read_df.explode('gene').reset_index(drop=True)
+
 		cref = ref_read_df.groupby(['cb','gene'])['ub'].nunique().reset_index().rename({"ub":"ub_ref"},axis=1)
 		cref['pos'] = str(chr) + ':'+ str(loc)
 		cref['allele_ref'] = ref
@@ -28,6 +31,9 @@ def pile_2_record(row):
 	if alt_read is not np.nan :
 		alt_read_mtx = np.array(re.split(',|:',alt_read)).reshape((-1,3))
 		alt_read_df = pd.DataFrame(alt_read_mtx, columns=['cb','ub','gene']).drop_duplicates()
+		alt_read_df['gene'] = alt_read_df['gene'].str.split('[ ;]')
+		alt_read_df = alt_read_df.explode('gene').reset_index(drop=True)
+
 		calt = alt_read_df.groupby(['cb','gene'])['ub'].nunique().reset_index().rename({"ub":"ub_alt"},axis=1)
 		calt['pos'] = str(chr) + ':' + str(loc)
 		calt['allele_alt'] = alt
@@ -55,7 +61,7 @@ def main():
 	outfile  = sys.argv[3]
 
 	# header: chr;loc;ref;A;T;C;G
-	pdf = pd.read_csv(pilefile, sep=";",header=0,
+	pdf = pd.read_csv(pilefile, sep="\t",header=0,
 		names=['chr','loc','ref','A','T','C','G'],dtype={'chr':str,'loc':int})
 	pdf['ref'] =  pdf['ref'].astype('category')
 	pdf.dropna(thresh=4,inplace=True)

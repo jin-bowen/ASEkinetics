@@ -1,20 +1,20 @@
 #!/bin/sh
 
 #SBATCH -J txb
-#SBATCH --time=3-12:00:00
-#SBATCH -N 1
-#SBATCH -n 10
-#SBATCH --mem=32gb
+#SBATCH --time=12:00:00
+#SBATCH --nodes=1
+#SBATCH --ntasks-per-node=16
+#SBATCH --mem-per-cpu=4gb
 
 ind=$1
-dir=/mnt/pan/Data14/hPSC
-
-# get mtx
-python $HOME/ASE/lib/sparse.py $dir/${ind}/outs/filtered_feature_bc_matrix $dir/${ind}/${ind}
+dir=/mnt/pan/Data14/1kgp
 
 reads=${dir}/${ind}/${ind}.mtx
 ase=${dir}/${ind}/${ind}.ase
 cb=${dir}/${ind}/${ind}.cb
+ase_infer=${dir}/${ind}/${ind}.ase.infer
 
-python $HOME/ASE/lib/txburst.py ${reads} ${ase} ${cb} ${ind} ${dir}/${ind}
+python $HOME/ASEkinetics/lib/ase_infer.py ${reads} ${ase} ${cb} ${ind} ${dir}/${ind}
+python $HOME/ASEkinetics/lib/txburst.py ${ase_infer} ${ind} ${dir}/${ind}
+
 

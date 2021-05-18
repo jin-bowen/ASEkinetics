@@ -44,20 +44,22 @@ def allele_class(ase, outfile=None, save=False):
 		df_grp_uniq[cols].to_csv(outfile,index=False,float_format='%.5f')
 	return df_grp_uniq
 
-def allele_infer(umi, ase, ase_class_raw, outfile):
+def allele_infer(umi, ase, ase_class_raw, outfile, min_cb=10):
 	
 	cols = ['cb','gene','pos','allele_ref','ub_ref','allele_alt','ub_alt','umi']
 
 	ase_tab_intersect = pd.merge(umi,ase,on=['cb','gene'])
-	ase_tab_intersect[cols].to_csv(outfile,index=False)
+	ase_tab_intersect[cols].to_csv(outfile+'.org',index=False)
 
 	ase_tab_full = pd.merge(umi,ase,how='left',on=['cb','gene'])
 	ase_tab      = ase_tab_full[ase_tab_full['pos'].isna()]
 
-	ase_class = ase_class_raw[ase_class_raw['cb_count'] > 10]
+	ase_class = ase_class_raw[ase_class_raw['cb_count'] > min_cb]
 	ase_tab_class = pd.merge(ase_tab, ase_class, on='gene',suffixes=('_tab', ''))
 
-	f = open(outfile, 'a')
+	f = open(outfile+'.infer', 'a')
+	f.write(','.join(cols) )
+	f.write('\n')
 	for i, row in ase_tab_class.iterrows():
 
 		dst = row['alt_ratio_list']	
@@ -100,7 +102,7 @@ def main():
 	ase_class = allele_class(ase,save=True,outfile=outfile)
 
 	# infer ase
-	ase_infer_outfile = '%s/%s.ase.infer'%(outdir,name)
+	ase_infer_outfile = '%s/%s.ase'%(outdir,name)
 	allele_infer(umi,ase,ase_class,ase_infer_outfile)
 
 if __name__ == "__main__":

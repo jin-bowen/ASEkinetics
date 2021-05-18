@@ -1,5 +1,6 @@
 from joblib import delayed,Parallel
 from estimation import *
+from D3EUtil import *
 import pandas as pd
 import dask.dataframe as dd
 import numpy as np
@@ -37,12 +38,39 @@ def estimate_by_row(row):
 	if len(mrna) < 50: 
 		return [gene,allele] + [None, None, None, None, None]
 
+	mean = np.mean(mrna)
+	var  = np.var(mrna)
+
 	obj1  = mRNAkinetics(mrna)
 	obj1.MaximumLikelihood()
 	mrna_kpe = obj1.get_estimate()
 
-	return [gene,allele] + mrna_kpe + [len(mrna),np.mean(mrna)]
-		
+	obj2  = mRNAkineticsPoisson(mrna)
+	obj2.MaximumLikelihood()
+	pksyn = obj2.get_estimate()
+	return [gene,allele] + mrna_kpe + pksyn + [len(mrna),mean,var]
+
+def estimate_by_row_gibbs(row):
+	
+	gene = row['gene']
+	allele = row['allele']
+	mrna = row['list']
+	if len(mrna) < 50: 
+		return [gene,allele] + [None, None, None, None, None]
+
+	mean = np.mean(mrna)
+	var  = np.var(mrna)
+
+	obj2  = mRNAkineticsPoisson(mrna)
+	obj2.MaximumLikelihood()
+	pksyn = obj2.get_estimate()
+	
+	params, bioParams = getParamsBayesian(mrna)
+	
+	return [gene,allele] + pksyn + \
+		[params.alpha.value, params.beta.value, params.gamma.value] + \
+		[len(mrna),mean,var]
+
 def main():
 
 	ase_infer = sys.argv[1]
@@ -50,14 +78,14 @@ def main():
 	outdir   = sys.argv[3]
 
 	inferred_allele_df = pd.read_csv(ase_infer)
-
+	suffix = ase_infer.split('.')[-1]
 	# txb estimation
 	df= process(inferred_allele_df)
 
 	data = Parallel(n_jobs=10)(delayed(estimate_by_row)(row) for i,row in df.iterrows())
-	out = pd.DataFrame(data,columns=['gene','allele','kon','koff','ksyn','n','mean'])
+	out = pd.DataFrame(data,columns=['gene','allele','kon','koff','ksyn','pksyn','n','mean','var'])
 
-	outfile = '%s/%s.mle.infer'%(outdir,name)
+	outfile = '%s/%s.mle.%s'%(outdir,name,suffix)
 	out.dropna().to_csv(outfile, index=False,float_format='%.5f')
 
 if __name__ == "__main__":

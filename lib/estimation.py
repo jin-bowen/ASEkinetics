@@ -105,7 +105,6 @@ class mRNAkinetics(object):
 		if np.isnan(init).any() or any(init < 0):init = np.array([10,10,10])
 
 		bnds = ((1e-3,1e3),(1e-3,1e3), (1, 1e4))
-		ll = minimize(self.LogLikelihood,init,args = (vals_),method=method,bounds=bnds)
 		try:
 			ll = minimize(self.LogLikelihood,init,args = (vals_),method=method,bounds=bnds)
 			self.estimate = list(ll.x)
@@ -115,22 +114,49 @@ class mRNAkinetics(object):
 	def get_estimate(self):
 		return self.estimate
 
+class mRNAkineticsPoisson(object):
+
+	def __init__(self, vals):
+		self.vals = vals	
+		self.estimate = None
+	
+	def Poisson(self,value,ms):
+		prob = stats.poisson.pmf(value, ms)
+		return(prob)
+	
+	def LogLikelihood(self,x,value):
+		ksyn = x
+		return(-np.sum(np.log(self.Poisson(value,ksyn) + 1e-10)))
+	
+	def MomentInference(self,value):
+		m1 = float(np.mean(value))
+		m2 = float(np.var(value))	
+		return m2
+
+	def MaximumLikelihood(self, method = 'L-BFGS-B'):
+
+		if len(self.vals) == 0: 
+			self.estimate = [np.nan]
+			return 0
+		vals_ = np.copy(self.vals) # Otherwise the structure is violated.
+		init = self.MomentInference(vals_)
+		try:
+			ll = minimize(self.LogLikelihood,init,args = (vals_),method=method)
+			self.estimate = list(ll.x)
+		except:
+			self.estimate = [np.nan]
+
+	def get_estimate(self):
+		return self.estimate
+
 def main():
 	mtx = sys.argv[1]
 	reads = np.loadtxt(mtx)
 
 	mrna = reads[:,0]
-	protein = reads[:,1]
 	obj1  = mRNAkinetics(mrna)
 	obj1.MaximumLikelihood()
 	mrna_kpe = obj1.get_estimate()
-
-	obj2 = proteinkinetics(mrna,mrna_kpe,protein)
-	obj2.MomentInference()
-	prot_kpe = obj2.get_estimate()
-
-	print(mrna_kpe)
-	print(prot_kpe)
 	
 if __name__ == "__main__":
 	main()

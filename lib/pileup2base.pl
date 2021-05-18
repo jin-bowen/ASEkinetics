@@ -32,7 +32,7 @@ if($BQcut!~/^\d/){
 #Do the parsing
 open FILE, $input or die "error, can not open $input";
 open WFILE, '>', $output or die "error can not open $output to write";
-print WFILE "chr;"."loc;"."ref;"."A;"."T;"."C;"."G\n";
+print WFILE "chr\t"."loc\t"."ref\t"."A\t"."T\t"."C\t"."G\n";
 print "[",scalar(localtime),"] Begin parsing...\n";
 while(<FILE>){
     s/\r|\n//g;
@@ -141,7 +141,7 @@ while(<FILE>){
     chop($T);
     chop($C);
     chop($G);
-    print WFILE "$chr".";"."$loc".";".$ref.";".$A.";".$T.";".$C.";".$G."\n";	
+    print WFILE "$chr"."\t"."$loc"."\t".$ref."\t".$A."\t".$T."\t".$C."\t".$G."\n";	
 }#end the reading of the file
 close FILE;
 close WFILE;
