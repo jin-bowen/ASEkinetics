@@ -150,13 +150,19 @@ class mRNAkineticsPoisson(object):
 		return self.estimate
 
 def main():
-	mtx = sys.argv[1]
-	reads = np.loadtxt(mtx)
 
-	mrna = reads[:,0]
-	obj1  = mRNAkinetics(mrna)
+	mtx = sys.argv[1]
+	read = np.loadtxt(mtx)
+	obj1  = mRNAkinetics(read)
 	obj1.MaximumLikelihood()
-	mrna_kpe = obj1.get_estimate()
+	kpe = obj1.get_estimate()
+	#kon, koff, ksyn, kon_error, koff_error, ksyn_error = obj1.metropolis_hastings()
+	#record = [ kon, koff, ksyn, kon_error, koff_error, ksyn_error ]
+	#kpe_df.loc[i] = record
+	kon, koff, ksyn = kpe
+	record = [ kon, koff, ksyn ]
+	print(record)
+
 	
 if __name__ == "__main__":
 	main()

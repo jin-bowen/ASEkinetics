@@ -1,6 +1,6 @@
+from itertools import compress
 import pandas as pd
 import numpy as np
-from itertools import compress
 import sys 
 import re
 

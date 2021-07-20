@@ -2,29 +2,16 @@
 
 #SBATCH -J align
 #SBATCH --time=5-12:00:00
-#SBATCH -N 4
-#SBATCH -n 10
+#SBATCH -N 1
+#SBATCH -n 8
 #SBATCH --mem=32gb
 
 ind=$1
-dir=$HOME/fastq
-ref=$HOME/refdata-cellranger-GRCh38-3.0.0
+dir=/mnt/pan/Data14/1kgp
 
-cellranger mkgtf Homo_sapiens.GRCh37.87.gtf Homo_sapiens.GRCh37.87.filtered.gtf \
-                 --attribute=gene_biotype:protein_coding \
-                 --attribute=gene_biotype:lincRNA \
-                 --attribute=gene_biotype:antisense
-
-cellranger mkref --genome=hg19 \
-                 --fasta=Homo_sapiens.GRCh37.dna.primary_assembly.fa \
-                 --genes=Homo_sapiens.GRCh37.87.filtered.gtf \
-                 --ref-version=3.0.0
-
-cellranger count --id=${ind} \
-		--transcriptome=${ref} \
-		--fastqs=$dir/${ind}
-		--nosecondary
+cellranger count --id=sc_${ind} --nosecondary \
+                   --transcriptome=$HOME/refdata-cellranger-GRCh38-3.0.0 \
+                   --fastqs=$dir/fastq/${ind}
 
 echo 'End of SLURM'
-
 
