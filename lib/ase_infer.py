@@ -91,11 +91,11 @@ def main():
 	ase_raw['ub_ref'] = ase_raw['ub_ref'].fillna(0)	
 
 	# filtered cells 
-	cb_raw = pd.read_csv(cb_file,dtype='str',header=None,names=['cb'])
-	umi = pd.merge(umi_raw, cb_raw, on='cb')
-	ase = pd.merge(ase_raw, cb_raw, on='cb')
+	cb_raw = pd.read_csv(cb_file,header=0)
+	cb_keep = cb_raw.loc[cb_raw['keep']==1]
+	umi = pd.merge(umi_raw, cb_keep, on='cb')
+	ase = pd.merge(ase_raw, cb_keep, on='cb')
 
-	# infer class
 	outfile = '%s/%s.ase.class'%(outdir,name)
 	ase_class = allele_class(ase,save=True,outfile=outfile)
 

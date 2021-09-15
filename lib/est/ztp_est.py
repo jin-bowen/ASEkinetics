@@ -65,7 +65,13 @@ class mRNAkinetics(object):
 		x,w = j_roots(50,alpha = bet - 1, beta = alpha - 1)
 		gs = np.sum(w*self.fun(at, m = lam*(1+x)/2), axis=1)
 		prob = 1/beta_fun(alpha, bet)*2**(-alpha-bet+1)*gs
-		return(prob)
+
+		x0,w0 = j_roots(50,alpha = bet - 1, beta = alpha - 1)
+		at0 = np.zeros((len(at),50))
+		gs0 = np.sum(w0*self.fun(at0, m = lam*(1+x)/2), axis=1)
+		prob_w0 = 1/beta_fun(alpha, bet)*2**(-alpha-bet+1)*gs0
+
+		return(prob/prob_w0)
 	
 	def LogLikelihood(self,x,value):
 		kon,koff,ksyn = x

@@ -9,12 +9,14 @@
 ind=$1
 dir=/mnt/pan/Data14/1kgp
 vcf=${dir}/${ind}/${ind}_wgs_grch38_het.vcf
-refFlat=$HOME/refdata-cellranger-GRCh38-3.0.0/genes/genes.gtf
 
-pileup=${dir}/${ind}/sub_parser/${ind}.parser${SLURM_ARRAY_TASK_ID}
-python $HOME/ASE/lib/ase.py ${pileup} ${vcf} ${dir}/${ind}/sub_parser/${ind}_${SLURM_ARRAY_TASK_ID}
-#cat ${dir}/${ind}/sub_parser/${ind}_*.ase > ${dir}/${ind}/${ind}.ase
+pileup=${dir}/${ind}/${ind}.parser
+python $HOME/ASE/lib/ase.py ${pileup} ${vcf} ${dir}/${ind}
 
-
-
+reads=${dir}/${ind}/${ind}.mtx
+ase=${dir}/${ind}/${ind}.ase
+cb=${dir}/${ind}/${ind}.qc
+python $HOME/ASE/lib/ase_infer.py ${reads} ${ase} ${cb} ${ind} ${dir}/${ind}
+ase_infer=${dir}/${ind}/${ind}.ase.infer
+python $HOME/ASE/lib/ase_reform.py ${ase_infer} ${dir}/${ind}/${ind}
 

@@ -1,85 +1,104 @@
 from joblib import delayed,Parallel
-from est import full_MCMC_est
-from est import pb_est
-from est import gibbs_est
+from scipy import sparse
+from est import full_est, pb_est, gibbs_est
+from ase_reform import process
 import pandas as pd
 import numpy as np
 import sys
 
-def est_row(row,method='full'):
-	gene   = row['gene']
-	allele = row['allele']
-	read   = row['list']
+def est_vec(reads,method='full'):
 
-	n      = len(read)
-	mean   = np.mean(read)
-	var    = np.var(read)
-
-	if len(read) < 50:
-		return [gene,allele] + [None, None, None] + [n, mean, var]
+	n      = len(reads)
+	mean   = np.mean(reads)
+	var    = np.var(reads)
+	
+	if mean == 0:
+		return [None, None, None] + [n, mean, var]
 
 	if method == 'full':
-		obj1  = full_MCMC_est.mRNAkinetics(read)
+		obj1  = full_est.mRNAkinetics(reads)
 		obj1.MaximumLikelihood()
 		kpe = obj1.get_estimate()
-		#kon, koff, ksyn, kon_error, koff_error, ksyn_error = obj1.metropolis_hastings()
-		#record = [ kon, koff, ksyn, kon_error, koff_error, ksyn_error ]
-		#kpe_df.loc[i] = record
 		kon, koff, ksyn = kpe
 
 	elif method == 'pb':
-		obj1  = pb_est.mRNAkinetics(read)
+		obj1  = pb_est.mRNAkinetics(reads)
 		obj1.MaximumLikelihood()
 		kpe = obj1.get_estimate()
 		kon, koff, ksyn = kpe
 
 	elif method == 'gibbs':
-		params1, bioParams1 = gibbs_est.getParamsBayesian(read)
+		params1, bioParams1 = gibbs_est.getParamsBayesian(reads)
 		kon  = params1.alpha.mean()
 		koff = params1.beta.mean()
 		ksyn = params1.gamma.mean()
-
-	return [ gene, allele, kon, koff, ksyn, n, mean, var ]
-
-def process(df):
-	df['ref_infer'] = np.ceil(df['ub_ref'] * df['umi']/ (df['ub_ref'] + df['ub_alt']))
-	df['alt_infer'] = df['umi'] - df['ref_infer']
-
-	df['allele_pos'] = df[['gene','pos','allele_ref','allele_alt']].agg('_'.join, axis=1)
-	df_grp = df.groupby('allele_pos')['ref_infer','alt_infer']
-
-	out = pd.DataFrame(columns=['gene','allele','list'])
-	for key, group in df_grp:
-		key_list = key.split('_')
-		igene = key_list[0]
-		ref_allele_id = key_list[1] + '_' + key_list[2]
-		alt_allele_id = key_list[1] + '_' + key_list[3]
-
-		ref_val = group['ref_infer'].values
-		alt_val = group['alt_infer'].values
-
-		ref_nonzero = ref_val[np.where(ref_val!=0)]
-		alt_nonzero = alt_val[np.where(alt_val!=0)]
-
-		out.loc[len(out.index)] = [igene, ref_allele_id, ref_nonzero]
-		out.loc[len(out.index)] = [igene, alt_allele_id, alt_nonzero]
-	return out
+	
+	else: 
+		print('no matched method')
+		return 0
+	return [ kon, koff, ksyn, n, mean, var ]
 
 def main():
 
 	ase_infer  = sys.argv[1]
 	method     = sys.argv[2]
-	outfile    = sys.argv[3]
+	prefix     = sys.argv[3]
 
-	inferred_allele_df = pd.read_csv(ase_infer,header=0)
+	cb_label_flag = False
+	if len(sys.argv) > 4:
+		cb_label_in   = sys.argv[4]
+		cb_label_flag = True
 
-	cols = ['gene','allele','kon','koff','ksyn','n','mean','var']
-	outf = open(outfile, "w")
+	allele_list_in = prefix + '.allelei'
+	allele_list = np.loadtxt(allele_list_in, dtype=str)
+	
+	cb_list_in = prefix + '.cbi'
+	cb_list = np.loadtxt(cb_list_in, dtype=str)
+	
+	ase_sparse_mat_in = prefix + '.ase.npz'
+	ase_sparse_mat = sparse.load_npz(ase_sparse_mat_in)
 
-	processed_df = process(inferred_allele_df)
-	data = Parallel(n_jobs=8)(delayed(est_row)(row,method) for i,row in processed_df.iterrows())
-	res_df = pd.DataFrame(data,columns=cols)
-	res_df.to_csv(outf,index=False,float_format="%.5f")
+	cb_idx = pd.DataFrame(cb_list, columns=['cb'])
+	cb_idx.reset_index(inplace=True)
+	allele_idx = pd.DataFrame(allele_list, columns=['allele']) 
+	allele_idx.reset_index(inplace=True)
+
+	if cb_label_flag:
+		cb_label = pd.read_csv(cb_label_in,header=0,names=['cb','label'])
+		cb_idx_label = pd.merge(cb_idx, cb_label, how='left', on='cb')			
+
+		cb_idx_grp = cb_idx_label.groupby('label')
+		for label, igrp in cb_idx_grp:
+
+			cb_idx_sub = igrp['index'].values
+			ase_mat_sub = ase_sparse_mat.toarray()[:,cb_idx_sub]
+			
+			org_allele = allele_idx['allele'].tolist() 
+			out_index  = [ item + '-' + label for item in org_allele ]
+
+			data = Parallel(n_jobs=8)(delayed(est_vec)(vec,method) for i,vec in enumerate(ase_mat_sub))
+			out_kpe_file = prefix + '_' + label + '_' + method + '.est'
+			cols = ['kon','koff','ksyn','n','mean','var']
+			res_df = pd.DataFrame(data,columns=cols,index=out_index)
+			res_df.to_csv(out_kpe_file,float_format="%.5f")
+
+			ase_out = pd.DataFrame(ase_mat_sub, index=out_index)
+			out_ase_file = prefix + '_'  + label + '.ase.reform'
+			ase_out.to_csv(out_ase_file)
+
+	else:
+		ase_mat = ase_sparse_mat.toarray()	
+		out_index = allele_idx['allele'].tolist() 
+
+		data = Parallel(n_jobs=8)(delayed(est_vec)(vec,method) for i,vec in enumerate(ase_mat))
+		out_kpe_file = prefix + '_' + method + '.est'
+		cols = ['kon','koff','ksyn','n','mean','var']
+		res_df = pd.DataFrame(data,columns=cols,index=out_index)
+		res_df.to_csv(out_kpe_file,float_format="%.5f")
+
+		ase_out = pd.DataFrame(ase_mat, index=out_index)
+		out_ase_file = prefix + '.ase.reform'
+		ase_out.to_csv(out_ase_file)
 
 if __name__ == "__main__":
 	main()

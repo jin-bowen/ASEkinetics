@@ -7,7 +7,7 @@
 #SBATCH --mem=32gb
 
 ind=$1
-dir=/mnt/pan/Data14/1kgp
+dir=`pwd`
 vcf=${dir}/${ind}/${ind}_wgs_grch38_het.vcf
 refFlat=$HOME/refdata-cellranger-GRCh38-3.0.0/genes/genes.gtf
 

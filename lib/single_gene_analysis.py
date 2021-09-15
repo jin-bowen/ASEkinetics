@@ -2,41 +2,20 @@ import matplotlib.pyplot as plt
 import matplotlib as mpl
 import matplotlib.ticker as ticker
 from adjustText import adjust_text
+from scipy.stats import chi2
 mpl.use('Agg')
 mpl.rcParams['font.family'] = 'Avenir'
 plt.rcParams['font.size'] = 6
 plt.rcParams['axes.linewidth'] = 1
+from est import pb_est
+from evaluation import simLikelihoodRatioTest, GoF
 import pandas as pd
 import seaborn as sns
 import dask.dataframe as dd
 import pickle
 import numpy as np
+import scipy as sp
 import sys
-
-def process(df):
-
-	df['ref_infer'] = np.ceil(df['ub_ref'] * df['umi']/ (df['ub_ref'] + df['ub_alt']))
-	df['alt_infer'] = df['umi'] - df['ref_infer']
-
-	df['allele_pos'] = df[['gene','pos','allele_ref','allele_alt']].agg('_'.join, axis=1)
-	df_grp = df.groupby('allele_pos')['ref_infer','alt_infer']
-
-	out = pd.DataFrame(columns=['gene','allele','list'])
-	for key, group in df_grp:
-		key_list = key.split('_')
-		igene = key_list[0]
-		ref_allele_id = key_list[1] + '_' + key_list[2]
-		alt_allele_id = key_list[1] + '_' + key_list[3]
-
-		ref_val = group['ref_infer'].values
-		alt_val = group['alt_infer'].values
-
-		ref_nonzero = ref_val[np.where(ref_val!=0)]
-		alt_nonzero = alt_val[np.where(alt_val!=0)]
-
-		out.loc[len(out.index)] = [igene, ref_allele_id, ref_nonzero]
-		out.loc[len(out.index)] = [igene, alt_allele_id, alt_nonzero]
-	return out
 
 def plot_coordinate(gRNA_target,gene_coordinate,gRNA_coordinate,process_df_filter,kpe,out):
 
@@ -49,12 +28,12 @@ def plot_coordinate(gRNA_target,gene_coordinate,gRNA_coordinate,process_df_filte
 	
 	ratio = np.ceil(num_reg/16 + 1)
 
-	fig, ax = plt.subplots(nrows=4,gridspec_kw={'height_ratios': [1,ratio,1,2]},
+	fig, ax = plt.subplots(nrows=4,gridspec_kw={'height_ratios': [1.5,ratio,1,2]},
 				constrained_layout=True,figsize=(4,6))
 
 	color_list = sns.color_palette("husl", ngRNA)
 	color_dict = dict(zip(gRNA_coordinate['gRNA'].values, color_list))
-	color_dict['NTC'] = 'gray'
+	color_dict['gNTC'] = 'gray'
 
 	yticks = []
 	ytickslabel = []
@@ -87,7 +66,7 @@ def plot_coordinate(gRNA_target,gene_coordinate,gRNA_coordinate,process_df_filte
 		ytickslabel += [igRNA]
 	
 		if igRNA not in gRNA_target_grp.groups.keys(): continue
-		grp = gRNA_target_grp.get_group(igRNA)
+		grp = gRNA_target_grp.get_group(igRNA).drop_duplicates(subset=['regulator'], keep='last')
 
 		j = 0
 		ax[1].plot([igRNA_y-0.25, igRNA_y+0.25], [0,0],ls='-',c=icolor,linewidth=4)
@@ -97,16 +76,23 @@ def plot_coordinate(gRNA_target,gene_coordinate,gRNA_coordinate,process_df_filte
 		gRNA_len /= 0.5
 
 		if len(grp) > 16: fs = 2
-		else: fs = 4
+		else: fs = 2
+#		else: fs = 2
 
 		#within each group
 		for irow,record in grp.iterrows():
 			regulator = record['regulator']
-			reg_x = igRNA_y - 0.25 + ( - record[['start','end']].values + row['start'] )/ gRNA_len 
+			reg_x_abs = igRNA_y - 0.25 + ( - record[['start','end']].values + row['start'] )/ gRNA_len 
+
+			reg_x1 = np.max([reg_x_abs[0], igRNA_y-0.25])
+			reg_x2 = np.min([reg_x_abs[1], igRNA_y+0.25])
+
+			reg_x_coord = [reg_x1,reg_x2]
+
 			reg_y = j+1
 			reg_y_coord = [reg_y,reg_y]
 
-			ax[1].plot(reg_x, reg_y_coord,'k-',linewidth=0.5)
+			ax[1].plot(reg_x_coord, reg_y_coord,'k-',linewidth=0.5)
 			ax[1].text(igRNA_y+0.25, reg_y, regulator, fontsize=fs)
 			j += 1
 		
@@ -127,7 +113,7 @@ def plot_coordinate(gRNA_target,gene_coordinate,gRNA_coordinate,process_df_filte
 
 	g = sns.violinplot(y="list", x="gRNA", palette=color_dict, \
 			ax=ax[2], data=process_df_filter,linewidth=0.01, \
-			order = ['NTC']+ytickslabel[1:])
+			order = ['gNTC']+ytickslabel[1:])
 	sns.despine(ax=ax[2], top=False, right=False, left=False)
 	ax[1].sharex(ax[2])
 	ax[1].axes.xaxis.set_visible(False)
@@ -138,10 +124,10 @@ def plot_coordinate(gRNA_target,gene_coordinate,gRNA_coordinate,process_df_filte
 	ax[2].spines['left'].set_visible(False)
 
 	ax[2].set(ylabel='UMI',xlabel='')
-	g.set_xticklabels(['NTC']+ytickslabel[1:], fontsize=6, rotation=15)
+	g.set_xticklabels(['gNTC']+ytickslabel[1:], fontsize=6, rotation=30)
 	g1 = sns.barplot(x='variable',y='value', hue='gRNA',data=kpe,ax=ax[3],
-			palette=color_dict, ci=None, hue_order=['NTC']+ytickslabel[1:])
-	ax[3].set(xlabel='',ylabel='fold change')
+			palette=color_dict, ci=None, hue_order=['gNTC']+ytickslabel[1:])
+	ax[3].set(xlabel='',ylabel='log2(fold change)')
 	ax[3].axhline(y=0, c='k',linewidth=0.5, ls='--', label='0')
 	ax[3].get_legend().remove()
 	ax[3].spines['top'].set_visible(False)
@@ -156,91 +142,109 @@ def plot_coordinate(gRNA_target,gene_coordinate,gRNA_coordinate,process_df_filte
 
 def main():
 
-	ase_infer = sys.argv[1]
-	cb_w_gRNA = sys.argv[2]
-	gRNA_in   = sys.argv[3]
+	gene   = sys.argv[1]
+	allele = sys.argv[2]
+	kpe_in = sys.argv[3] 
 
-	tss_in         = sys.argv[4]
-	gRNA_target_in = sys.argv[5]
+	ase_dir   = sys.argv[4]
 
-	gene   = sys.argv[6]
-	allele = sys.argv[7]
-
-	de_in  = sys.argv[8]
-	kpe_in = sys.argv[9] 
+	tss_in    = sys.argv[5]
+	gRNA_in   = sys.argv[6]
+	gRNA_target_in = sys.argv[7]
 
 	tss_df = pd.read_csv(tss_in, names=['chr','start','end','gene','score','strand'], \
 		sep='\t|,',engine='python')
-	gRNA_target = pd.read_csv(gRNA_target_in, sep='\t|,',engine='python',\
-		names=['chr','start','end','regulator','score','strand',\
-			'gchr','gstart','gend','gRNA','infor'])
-	gRNA_df = pd.read_csv(gRNA_in, sep='\s+|\t|,',engine='python',\
-		usecols=range(4),names=['chr','start','end','gRNA'])
-	gRNA_df.drop_duplicates(inplace=True)
+	gRNA_target = pd.read_csv(gRNA_target_in,sep='\t',
+		names=['gchr','gstart','gend','gRNA','chr','start','end','regulator'])
 
-	inferred_allele_df = dd.read_csv(ase_infer,header=0)
-	select = inferred_allele_df['gene']==gene 
-	inferred_allele_df_subset = inferred_allele_df.loc[select,:].compute()
+	gRNA_df = pd.read_csv(gRNA_in, sep='\t',header=0, names=['chr','start','end','gRNA'])
 
-	cb_gRNA_df = pd.read_csv(cb_w_gRNA, sep=' ',header=None, names=['cb_w_exp','gRNA','gRNA-grp'])
-	bool_var = cb_gRNA_df['gRNA-grp']=='NTC'
-	cb_gRNA_df.loc[ bool_var,'grp'] = 'NTC'
-	cb_gRNA_df.loc[~bool_var,'grp'] = cb_gRNA_df.loc[~bool_var,'gRNA']
-	cb_gRNA_df.drop(['gRNA', 'gRNA-grp'], axis=1, inplace=True)
-	cb_gRNA_df.drop_duplicates(inplace=True)
-	#select by gene and allele
-	df = pd.merge(inferred_allele_df_subset,cb_gRNA_df,left_on='cb',right_on='cb_w_exp')
-	# extract gRNA and NTC group
-	df_grp = df.groupby('grp')
+	kpe_raw = pd.read_csv(kpe_in, header=0, index_col=0)
+	kpe_raw[['gene','allele','gRNA']] = kpe_raw.index.to_series().str.split('-', n=2, expand=True)
+	kpe = kpe_raw.loc[(kpe_raw['gene']==gene) & (kpe_raw['allele']==allele)]
 
-	de_raw  = dd.read_csv(de_in, header=0)
-	kpe_raw = dd.read_csv(kpe_in, header=0)
+	process_df = pd.DataFrame(columns=['gRNA','list'])
+	for i,gRNA in enumerate(kpe['gRNA'].unique()): 
+		ase_in = ase_dir + '/' + gene + '_' + gRNA + '.ase.reform'
+		ase = pd.read_csv(ase_in, header=0, index_col=0)
+		index = gene + '-' + allele + '-' + gRNA
+		ase_numeric = ase.loc[index].values.reshape(-1)
 
-	de  = de_raw.loc[(de_raw['gene']==gene) & (de_raw['allele']==allele)].compute()
-	kpe = kpe_raw.loc[(kpe_raw['gene']==gene) & (kpe_raw['allele']==allele)].compute()
+		process_df.loc[i,'gRNA'] = gRNA
+		process_df.loc[i,'list'] = ase_numeric
 
-	process_df = pd.DataFrame(columns=['gene','gRNA','allele','list'])
-	for target, igrp in df_grp:
-		target_grp = df_grp.get_group(target) 
-		process_df_temp =  process(target_grp)
-		process_df_temp = process_df_temp[process_df_temp['allele']==allele]
-		process_df_temp['gRNA'] = target
-		process_df = process_df.append(process_df_temp,ignore_index=True)
+	kpe['bs']  = kpe['ksyn']/kpe['koff']
+	kpe['bf']  = kpe['kon'] * kpe['koff'] 
+	kpe['bf'] /= kpe['kon'] + kpe['koff']
+	kpe['n']  = kpe['kon']/(kpe['kon']+kpe['koff'])
+	kpe['τ'] = 1/(kpe['kon']+kpe['koff'])
 
-	sig_filter = de[['ks','mwu','ad']] < 0.1
-	sig_filter_bool = sig_filter.any(axis='columns')	
-	gRNA_filter = de.loc[sig_filter_bool,'gRNA'].tolist()
+	# DE test
+	kpe_ctrl = kpe[kpe['gRNA']=='gNTC']
+	ctrl_kp = kpe_ctrl[['kon','koff','ksyn']].values[0]
+	ctrl_reads = process_df.loc[process_df['gRNA']=='gNTC','list'].values[0]
+	for gRNA in kpe['gRNA'].tolist():
+		kp_bool = kpe['gRNA']==gRNA
+		gRNA_kp = kpe.loc[kp_bool,['kon','koff','ksyn']].values[0]
+		read_bool = process_df['gRNA']==gRNA
+		gRNA_reads = process_df.loc[read_bool,'list'].values[0]
+		lr_pval = simLikelihoodRatioTest(gRNA_kp, gRNA_reads, ctrl_kp, ctrl_reads)		
+		kpe.loc[kp_bool,'lr_pval'] = lr_pval
+		q, chisq_pval = GoF(gRNA_reads,ctrl_reads)
+		kpe.loc[kp_bool,'chisq_pval'] = chisq_pval
 
-	if len(gRNA_filter) < 1: return 0
+	# change abosulate value to fold
+	for kp in ['kon','koff','ksyn','bs','bf','n','τ','mean']:
+		kpe[kp] = kpe[kp]/kpe_ctrl[kp].values[0]
+		kpe[kp] = kpe[kp].transform(np.log2)
+
+	fold_thres = np.log2(2)
+#	# check if the gNTC and NTC are different
+#	kpe_gNTC = kpe[kpe['gRNA']=='gNTC'] 
+#	bool_change = (abs(kpe_gNTC['kon']) > fold_thres) | \
+#		(abs(kpe_gNTC['koff']) > fold_thres) | \
+#		(abs(kpe_gNTC['ksyn']) > fold_thres)
+#
+#	if bool_change.values[0]: 
+#		print(gene, allele, 'gNTC is not consistent with NTC')
+#		return 0
+#
+#	# filter by kpe fold change
+	bool_filter_fc = (abs(kpe['kon']) > fold_thres) | \
+		(abs(kpe['koff']) > fold_thres) | \
+		(abs(kpe['ksyn']) > fold_thres)
+#	gRNA_filter = kpe.loc[bool_filter,'gRNA'].tolist()
+#	# filter by burst kp fold change
+#	bool_filter = (abs(kpe['bs']) > fold_thres) | \
+#		(abs(kpe['bf']) > fold_thres) 
+#	gRNA_filter = kpe.loc[bool_filter,'gRNA'].tolist()
+	
+	bt = 0.01
+	bool_filter_bt = (kpe['lr_pval'] < bt) | (kpe['chisq_pval'] < bt)
+	bool_filter = bool_filter_fc & bool_filter_bt
+	gRNA_filter = kpe.loc[bool_filter,'gRNA'].tolist()
+	gRNA_filter = set(gRNA_filter) - set(['NTC'])
+	gRNA_filter = list(gRNA_filter)
+	if len(gRNA_filter) < 2: return 0
+
+	kpe_filter = kpe[bool_filter]
+	kpe_df_reform = pd.melt(kpe_filter, id_vars=['gene','allele','gRNA'],\
+			value_vars=['kon','koff','ksyn','bs','bf','n','τ','mean'])
 
 	# create violin plot format
-	process_df_filter = process_df[process_df['gRNA'].isin(gRNA_filter+['NTC'])]
+	process_df_filter = process_df[process_df['gRNA'].isin(gRNA_filter+['gNTC'])]
 	process_df_filter = process_df_filter.explode('list',ignore_index=True)
-	process_df_filter["list"] = pd.to_numeric(process_df_filter["list"])
+	process_df_filter = process_df_filter.explode('list',ignore_index=True)
+	process_df_filter['list'] = process_df_filter['list'].astype(np.float32)
 
-	#modify kpe profile
-	kpe_filter = kpe[kpe['gRNA'].isin(gRNA_filter+['NTC'])]
-	if len(kpe_filter) < 2: return 0
-	
-	kpe_filter['bs']  = kpe_filter['ksyn']/kpe_filter['koff']
-	kpe_filter['bf']  = kpe_filter['kon'] * kpe_filter['koff'] 
-	kpe_filter['bf'] /= kpe_filter['kon'] + kpe_filter['koff']
-	kpe_filter['mu']  = kpe_filter['kon']/(kpe_filter['kon']+kpe_filter['koff'])
-	kpe_filter['tau'] = 1/(kpe_filter['kon']+kpe_filter['koff'])
-	kpe_ctrl = kpe_filter[kpe_filter['gRNA']=='NTC']
-	for kp in ['kon','koff','ksyn','bs','bf','mu','tau','mean']:
-		kpe_filter[kp] = kpe_filter[kp]/kpe_ctrl[kp].values[0] - 1
-
-	kpe_df_reform = pd.melt(kpe_filter, id_vars=['gene','allele','gRNA'],\
-			value_vars=['kon','koff','ksyn','bs','bf','mu','tau','mean'])
-
-	
 	gene_coordinate = tss_df[tss_df['gene']==gene].squeeze()
 	gRNA_coordinate = gRNA_df[gRNA_df['gRNA'].isin(gRNA_filter)]
 	gRNA_target_filter = gRNA_target[gRNA_target['gRNA'].isin(gRNA_filter)]
+
 	gRNA_coordinate.reset_index(inplace=True, drop=True)
 	gRNA_coordinate.drop_duplicates(inplace=True)
-	plot_coordinate(gRNA_target_filter, gene_coordinate, gRNA_coordinate,process_df_filter, kpe_df_reform,gene+'_'+allele)
+
+	plot_coordinate(gRNA_target_filter, gene_coordinate, gRNA_coordinate, process_df_filter, kpe_df_reform, gene+'_'+allele)
 
 if __name__ == "__main__":
 	main()

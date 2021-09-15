@@ -1,4 +1,6 @@
+import matplotlib.pyplot as plt
 import dask.dataframe as dd
+from scipy import sparse
 import pandas as pd
 import numpy as np
 import scipy.io
@@ -37,22 +39,30 @@ def main():
 	n_barcode = barcodes.shape[0].compute()	
 	barcodes['icb'] = barcodes.index + 1
 	df = dd.merge(df_12, barcodes, on='icb')
+	df['mito_umi'] = df['mito'] * df['umi']
 
+	cb_stat = df.groupby('cb').agg({'igene': ['count'],\
+					'umi':['sum'],\
+					'mito_umi':['sum']}).compute()
+
+	cb_stat.columns = ['num_gene','num_umi','mito_umi']
+	cb_stat['mito_percent'] = cb_stat['mito_umi'] / cb_stat['num_umi']
+	num_gene_mean = np.mean(cb_stat['num_gene'])
+	num_gene_std  = np.std(cb_stat['num_gene'])
+	num_umi_mean  = np.mean(cb_stat['num_umi'])
+	num_umi_std  = np.std(cb_stat['num_umi'])
+
+	select1 = abs(cb_stat['num_gene'] - num_gene_mean) < num_gene_std
+	select2 = abs(cb_stat['num_umi'] - num_umi_mean) < num_umi_std
+	select3 = cb_stat['mito_percent'] < 0.2
+	cb_stat['keep'] = 0
+	cb_stat.loc[select1 & select2 & select3,'keep'] = 1
+
+	cb_stat[['num_gene','num_umi','mito_percent','keep']].to_csv(outfile+'.qc')
+	
 	# dense matrix
 	header=['cb','gene','umi']
-	df_uniq = df[header].drop_duplicates(subset=['cb', 'gene'], keep='last')
-	df_uniq.to_csv('%s.mtx'%outfile,header=True,index=False,single_file = True)
-
-	# filter valid barcode
-	df['mito_umi'] = df['umi'] * df['mito']
-	df_stat = df.compute().groupby(['cb']).agg(
-		tot_expr = pd.NamedAgg(column='umi',aggfunc='sum'),
-		mito_expr = pd.NamedAgg(column='mito_umi',aggfunc='sum'))
-
-	df_stat['mito_ratio'] = df_stat['mito_expr']/df_stat['tot_expr']
-	filter_bool = df_stat['mito_ratio'] < 0.1
-	cbfile = '%s.cb'%outfile
-	np.savetxt(cbfile, df_stat.loc[filter_bool].index, fmt='%s')
+	df[header].to_csv('%s.mtx'%outfile,header=True,index=False,single_file = True)
 
 if __name__ == "__main__":
 	main()

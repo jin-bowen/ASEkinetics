@@ -34,11 +34,11 @@ def pca_compare(kpe_df1,kpe_df2):
 
 	xs2 = kpe_df2['pc1']
 	ys2 = kpe_df2['pc2']
-	colors = {'G1':'gray', 'S':'green', 'G2M':'yellow'}
-	var_color = [ colors[x] for x in kpe_df2['cycle'].values ]
+#	colors = {'G1':'gray', 'S':'green', 'G2M':'yellow'}
+#	var_color = [ colors[x] for x in kpe_df2['cycle'].values ]
 
 	ax.scatter(xs1, ys1, s=2, c='silver', label='NA12878')
-	ax.scatter(xs2, ys2, s=2, c=var_color, label='simulation')
+#	ax.scatter(xs2, ys2, s=2, c=var_color, label='simulation')
 	
 	ax.set_xlabel('pc1')
 	ax.set_ylabel('pc2')
