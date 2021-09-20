@@ -1,7 +1,6 @@
 from joblib import delayed,Parallel
 from scipy import sparse
-from est import full_est, pb_est, gibbs_est
-from ase_reform import process
+from lib.est import full_est, pb_est, gibbs_est
 import pandas as pd
 import numpy as np
 import sys

@@ -40,8 +40,6 @@ def process(df):
 	allele_list = processed_df['gene_allele'].values
 	ngene    = processed_df.shape[0]
 
-	print(processed_df)
-
 	sparse_df = processed_df.explode('cb_umi_list')	
 	sparse_df[['cb','allele_umi']] = pd.DataFrame([*sparse_df['cb_umi_list']], sparse_df.index)
 	data = sparse_df['allele_umi'].tolist()

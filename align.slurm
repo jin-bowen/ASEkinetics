@@ -7,7 +7,6 @@
 #SBATCH --mem=32gb
 
 ind=$1
-dir=`pwd`
 
 cellranger count --id=sc_${ind} \
                    --transcriptome=$HOME/refdata-cellranger-GRCh38-3.0.0 \

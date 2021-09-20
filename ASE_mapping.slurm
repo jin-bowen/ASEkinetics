@@ -7,7 +7,6 @@
 #SBATCH --mem=32gb
 
 ind=$1
-dir=`pwd`
 vcf=${dir}/${ind}/${ind}_wgs_grch38_het.vcf
 refFlat=$HOME/refdata-cellranger-GRCh38-3.0.0/genes/genes.gtf
 
@@ -24,11 +23,11 @@ samtools mpileup -q50 -f $HOME/refdata-cellranger-GRCh38-3.0.0/fasta/genome.fa \
 	--output $dir/${ind}/${ind}_het.mpileup \
 	$dir/${ind}/outs/annotated_genome_bam.bam
 
-perl $HOME/ASE/lib/pileup2base.pl $dir/${ind}/${ind}_het.mpileup \
+perl ${dir}/ASEkinetics/lib/pileup2base.pl $dir/${ind}/${ind}_het.mpileup \
 	 33  $dir/${ind}/${ind}.parser
 
 # get mtx
-python $HOME/ASE/lib/csr_dense.py $dir/${ind}/outs/filtered_feature_bc_matrix \
+python ${dir}/ASEkinetics/lib/csr_dense.py $dir/${ind}/outs/filtered_feature_bc_matrix \
                $HOME/refdata-cellranger-GRCh38-3.0.0/mitochondrial.gene \
                $dir/${ind}/${ind}
 

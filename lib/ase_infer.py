@@ -55,7 +55,7 @@ def allele_infer(umi, ase, ase_class_raw, outfile, min_cb=10):
 	ase_class = ase_class_raw[ase_class_raw['cb_count'] > min_cb]
 	ase_tab_class = pd.merge(ase_tab, ase_class, on='gene',suffixes=('_tab', ''))
 
-	f = open(outfile+'.infer', 'a')
+	f = open(outfile+'.infer', 'w')
 	f.write(','.join(cols) )
 	f.write('\n')
 	for i, row in ase_tab_class.iterrows():
@@ -69,7 +69,7 @@ def allele_infer(umi, ase, ase_class_raw, outfile, min_cb=10):
 		row['ub_ref'] = 1 - infer_alt_ratio
 		row['ub_alt'] = infer_alt_ratio		
 
-		row[cols].to_frame().T.to_csv(f,header=False,\
+		row[cols].to_frame().T.to_csv(f,mode='a',header=False,\
 			index=False,float_format='%.5f')
 	f.close()
 

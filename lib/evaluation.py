@@ -1,7 +1,6 @@
 from joblib import delayed,Parallel
-from est import full_est, pb_est, gibbs_est
+from lib.est import full_est, pb_est, gibbs_est
 from scipy.stats import poisson, beta, power_divergence, chi2
-import dask.dataframe as dd
 import pandas as pd
 import numpy as np
 import scipy as sp
@@ -26,9 +25,7 @@ def simLikelihoodRatioTest(kp1, reads1, kp2, reads2):
 	lr2 = abs(lr2)
 	pval2 = chi2.sf(lr2, 3)
 
-	print(pval1,pval2)
 	return min(pval1,pval2)
-
 
 def LikelihoodRatioTest(kp1, reads1, kp2, reads2):
 
