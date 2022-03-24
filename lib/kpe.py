@@ -1,6 +1,6 @@
 from joblib import delayed,Parallel
 from scipy import sparse
-from lib.est import full_est, pb_est, gibbs_est
+from est import full_est, pb_est, gibbs_est
 import pandas as pd
 import numpy as np
 import sys
@@ -39,9 +39,8 @@ def est_vec(reads,method='full'):
 
 def main():
 
-	ase_infer  = sys.argv[1]
+	prefix     = sys.argv[1]
 	method     = sys.argv[2]
-	prefix     = sys.argv[3]
 
 	cb_label_flag = False
 	if len(sys.argv) > 4:

@@ -1,4 +1,3 @@
-import matplotlib.pyplot as plt
 import dask.dataframe as dd
 from scipy import sparse
 import pandas as pd
@@ -23,6 +22,7 @@ def main():
 		sep=' ', compression='gzip')
 
 	features_path = os.path.join(matrix_dir, "features.tsv.gz")
+#	feature_raw   = dd.read_csv(features_path,names=['gene_name','gene','type'],\
 	feature_raw   = dd.read_csv(features_path,names=['gene','gene_name','type'],\
 		sep='\t',compression='gzip')
 
@@ -52,11 +52,10 @@ def main():
 	num_umi_mean  = np.mean(cb_stat['num_umi'])
 	num_umi_std  = np.std(cb_stat['num_umi'])
 
-	select1 = abs(cb_stat['num_gene'] - num_gene_mean) < num_gene_std
-	select2 = abs(cb_stat['num_umi'] - num_umi_mean) < num_umi_std
+	select2 = (cb_stat['num_umi'] > (num_umi_mean - num_umi_std))
 	select3 = cb_stat['mito_percent'] < 0.2
 	cb_stat['keep'] = 0
-	cb_stat.loc[select1 & select2 & select3,'keep'] = 1
+	cb_stat.loc[select2 & select3,'keep'] = 1
 
 	cb_stat[['num_gene','num_umi','mito_percent','keep']].to_csv(outfile+'.qc')
 	

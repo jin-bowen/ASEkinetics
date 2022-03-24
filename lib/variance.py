@@ -17,7 +17,7 @@ class MCMC(object):
 	
 	def fun(self,at, m):
 		if (max(m) < 1e6): return(stats.poisson.pmf(at,m))
-		else: return(norm.pdf(at,loc=m,scale=sqrt(m)))
+		else: return(stats.norm.pdf(at,loc=m,scale=np.sqrt(m)))
 
 	def dBP(self,at, alpha, bet, lam):
 		at.shape = (len(at), 1)
@@ -25,6 +25,7 @@ class MCMC(object):
 		x,w = j_roots(50,alpha = bet - 1, beta = alpha - 1)
 		gs = np.sum(w*self.fun(at, m = lam*(1+x)/2), axis=1)
 		prob = 1/beta_fun(alpha, bet)*2**(-alpha-bet+1)*gs
+		
 		return(prob)
 
 	def LogLikelihood(self,x,value):
@@ -45,9 +46,11 @@ class MCMC(object):
 			accept=np.random.uniform(0,1)
 			return (accept < (np.exp(likelihood_new-likelihood)))	
 
-	def metropolis_hastings(self,iterations=10000):
+	def metropolis_hastings(self,iterations=1000,save=False,outfile=None):
 
-		transition_model = lambda x: np.random.normal(x,0.1*x) 
+		transition_model  = lambda x: min(max(1e-3,np.random.normal(x,0.1*x)),1e3)
+		transition_model2 = lambda x: min(max(1e-3,np.random.normal(x,0.1*x)),1e4)
+
 		data = np.copy(self.vals)
 		kon_init, koff_init, ksyn_init = self.estimate
 
@@ -57,6 +60,9 @@ class MCMC(object):
 		kon_sampled  = np.zeros(iterations)
 		koff_sampled = np.zeros(iterations)
 		ksyn_sampled = np.zeros(iterations)
+
+		ll_sampled   =  []
+
 		for i in range(iterations):
 			# update kon
 			kon_new     =  transition_model(kon) 
@@ -70,7 +76,7 @@ class MCMC(object):
 				kon = kon_new
 				kon_sampled[i]=kon_new
 
-			# update ksyn
+			# update koff
 			koff_new     =  transition_model(koff)    
 			koff_lik     = -self.LogLikelihood([kon_init, koff, ksyn_init], data)
 			koff_new_lik = -self.LogLikelihood([kon_init, koff_new, ksyn_init], data)	
@@ -83,16 +89,34 @@ class MCMC(object):
 				koff_sampled[i]=koff_new
 
 			# update ksyn
-			ksyn_new     =  transition_model(ksyn)    
+			ksyn_new     =  transition_model2(ksyn)    
 			ksyn_lik     = -self.LogLikelihood([kon_init, koff_init, ksyn], data)
 			ksyn_new_lik = -self.LogLikelihood([kon_init, koff_init, ksyn_new], data)	
 
 			LogPosterior = ksyn_lik	+ np.log(self.prior([kon_init, koff_init, ksyn]))
 			LogPosterior_new = ksyn_new_lik + np.log(self.prior([kon_init, koff_init, ksyn_new]))
 
+
 			if self.acceptance(LogPosterior, LogPosterior_new):
 				ksyn = ksyn_new
 				ksyn_sampled[i]=ksyn_new
+
+			if save is True:
+				# monitor loglikehood 
+				try: 
+					ll = self.LogLikelihood([kon, koff, ksyn],data)
+				except:
+					ll = np.nan
+				ll_sampled.append(ll)
+			#print(kon_new,koff_new,ksyn_new)
+		if save is True:
+			data_on_record = pd.DataFrame(columns=['kon','koff','ksyn','ll'])
+			data_on_record.loc[:,'kon']  = kon_sampled	
+			data_on_record.loc[:,'koff'] = koff_sampled	
+			data_on_record.loc[:,'ksyn'] = ksyn_sampled	
+			data_on_record.loc[:,'ll']   = ll_sampled
+
+			data_on_record.to_csv('%s_mcmc.dat'%outfile,index=False)
 
 		num_burnin = int(iterations/2)
 		kon_burnin  = kon_sampled[num_burnin:]
@@ -136,9 +160,10 @@ class MCMC(object):
 		return  kon_median,koff_median,ksyn_median,\
 			kon_ci_low, kon_ci_up,koff_ci_low, koff_ci_up,ksyn_ci_low, ksyn_ci_up
 
-def fun(org_data,org_kp):
+def fun(org_data,org_kp,outfile):
 	obj1  = MCMC(org_data, org_kp)
-	kon,koff,ksyn,kon_ci_low,kon_ci_up,koff_ci_low,koff_ci_up,ksyn_ci_low,ksyn_ci_up = obj1.metropolis_hastings()
+	kon,koff,ksyn,kon_ci_low,kon_ci_up,\
+		koff_ci_low,koff_ci_up,ksyn_ci_low,ksyn_ci_up = obj1.metropolis_hastings(save=False,outfile=outfile)
 	record=[kon,koff,ksyn,kon_ci_low,kon_ci_up,koff_ci_low,koff_ci_up,ksyn_ci_low,ksyn_ci_up]
 	return record
 
@@ -153,12 +178,12 @@ def main():
 	kpe = pd.read_csv(kpe_profile, header=0, index_col=0)
 	kpe.dropna(inplace=True)
 
-	ase_reform = pd.read_csv(ase_reform_in, header=0, index_col=0)
+	ase_reform = pd.read_csv(ase_reform_in, header=None, index_col=0)
 
 	# simulate the expression with pb
 	cols = ['kon','koff','ksyn']
 	data = Parallel(n_jobs=cpu_count())(\
-		delayed(fun)(ase_reform.loc[idx].values, row[cols].values) for idx,row in kpe.iterrows())
+		delayed(fun)(ase_reform.loc[idx].values, row[cols].values,outfile) for idx,row in kpe.iterrows())
 
 	add_cols = ['kon_mean','koff_mean','ksyn_mean',\
 			'kon_low','kon_upper',\

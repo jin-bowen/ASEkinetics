@@ -1,21 +1,22 @@
 #!/bin/sh
 
-#SBATCH -J ASE_mapping
+#SBATCH -J ase_infer
 #SBATCH --time=3-12:00:00
 #SBATCH -N 1
-#SBATCH -n 1
-#SBATCH --mem=32gb
+#SBATCH -n 6
+#SBATCH --mem=36gb
 
-ind=$1
-vcf=${dir}/${ind}/${ind}_wgs_grch38_het.vcf
+sample=$1
+dir=/mnt/pan/Data14/1kgp/${sample}
+ref=${HOME}/genome_ref/ref_GRCh38_genes.bed
 
-pileup=${dir}/${ind}/${ind}.parser
-python ${dir}/ASEkinetics/lib/ase.py ${pileup} ${vcf} ${dir}/${ind}
+reads=${dir}/${sample}.mtx
+ase=${dir}/${sample}.ase
+cb=${dir}/${sample}.qc
 
-reads=${dir}/${ind}/${ind}.mtx
-ase=${dir}/${ind}/${ind}.ase
-cb=${dir}/${ind}/${ind}.qc
-python ${dir}/ASEkinetics/lib/ase_infer.py ${reads} ${ase} ${cb} ${ind} ${dir}/${ind}
-ase_infer=${dir}/${ind}/${ind}.ase.infer
-python ${dir}/ASEkinetics/lib/ase_reform.py ${ase_infer} ${dir}/${ind}/${ind}
+python -W ignore $HOME/ASE/lib/ase_bn.py ${reads} ${ase} ${cb} ${dir}/${sample} > ${dir}/${sample}.ase.record 
+python -W ignore $HOME/ASE/lib/analysis/ase_infer_evaluation.py ${dir}/${sample}.ase.record ${ref} ${dir}/${sample}.qc 
+
+ase_infer=${dir}/${sample}.ase.infer
+python $HOME/ASE/lib/ase_reform_phased.py ${ase_infer} True ${dir}/${sample}
 

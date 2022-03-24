@@ -1,6 +1,7 @@
 from joblib import delayed,Parallel
-from lib.est import full_est, pb_est, gibbs_est
-from scipy.stats import poisson, beta, power_divergence, chi2
+from est import full_est,pb_est,gibbs_est
+from scipy.stats import poisson,beta,power_divergence,chi2,ks_2samp
+import dask.dataframe as dd
 import pandas as pd
 import numpy as np
 import scipy as sp
@@ -26,6 +27,7 @@ def simLikelihoodRatioTest(kp1, reads1, kp2, reads2):
 	pval2 = chi2.sf(lr2, 3)
 
 	return min(pval1,pval2)
+
 
 def LikelihoodRatioTest(kp1, reads1, kp2, reads2):
 
@@ -76,6 +78,13 @@ def pb_simulation(kpe_list, n):
 	vals = np.array([ poisson.rvs(imu) for imu in mu])
 	return list(vals)
 
+def kstest(isim_df, iorg_df):
+	try:
+		return ks_2samp(isim_df, iorg_df)[1]
+
+	except Exception as e:
+		return np.nan
+
 def GoF(isim_df, iorg_df):
 
 	max_sim = np.max(isim_df)
@@ -114,7 +123,7 @@ def main():
 	kpe.dropna(inplace=True)
 	n = kpe['n'].unique()
 
-	ase_reform = pd.read_csv(ase_reform_in, header=0, index_col=0)
+	ase_reform = pd.read_csv(ase_reform_in, header=None, index_col=0)
 
 	# simulate the expression with pb
 	cols = ['kon','koff','ksyn']
@@ -136,13 +145,16 @@ def main():
 		if np.sum(sim_data) == 0:
 			kpe.loc[idx,'chisq_pval'] = np.nan
 			kpe.loc[idx,'simlr_pval'] = np.nan
+			kpe.loc[idx,'ks_pval'] = np.nan
 			continue
 
 		chisq, p = GoF(sim_data, org_data)
+		ks_p = kstest(sim_data, org_data)
 		simlr = simLikelihoodRatioTest(sim_kp, sim_data, org_kp, org_data)		
 
 		kpe.loc[idx,'chisq_pval'] = p
 		kpe.loc[idx,'simlr_pval'] = simlr
+		kpe.loc[idx,'ks_pval']    = ks_p
 
 	kpe.to_csv(outfile)
 

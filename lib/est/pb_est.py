@@ -1,6 +1,4 @@
-from scipy.interpolate import interp1d
 from scipy.optimize import minimize
-from scipy import special
 from scipy.stats import poisson,norm
 from scipy.special import j_roots
 from scipy.special import beta as beta_fun
@@ -57,7 +55,7 @@ class mRNAkinetics(object):
 	
 	def fun(self,at, m):
 		if np.max(m) < 1e6: return(poisson.pmf(at,m))
-		else:return(norm.pdf(at,loc=m,scale=sqrt(m)))
+		else:return(norm.pdf(at,loc=m,scale=np.sqrt(m)))
 	
 	def dBP(self,at, alpha, bet, lam):
 		at.shape = (len(at), 1)
