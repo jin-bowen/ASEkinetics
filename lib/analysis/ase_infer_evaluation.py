@@ -51,9 +51,7 @@ def main():
 	ref_gene_tab = sys.argv[2]
 	outfile      = sys.argv[3]
 
-	ase_eval = pd.read_csv(ase_profile, header=None, \
-		names=['gene','nref','nall','percent','a_hat','Ia_lb','Ia_ub','b_hat','Ib_lb','Ib_ub'])
-
+	ase_eval = pd.read_csv(ase_profile, header=0)
 	ase_eval['a_qc'] = ase_eval.apply(lambda x: (x.Ia_lb > 0) & (x.Ia_ub > 0) ,axis=1)
 	ase_eval['b_qc'] = ase_eval.apply(lambda x: (x.Ib_lb > 0) & (x.Ib_ub > 0),axis=1)
 	ase_eval['qc']   = ase_eval.apply(lambda x: x.a_qc & x.b_qc,axis=1)

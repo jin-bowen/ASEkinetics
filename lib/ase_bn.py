@@ -56,25 +56,31 @@ def allele_infer(umi, ase, outfile):
 	ase_intersect.to_csv(outfile+'.org',index=False)
 
 	ase_intersect_grp = ase_intersect.groupby('gene')
-	ase_noASE_grp     = ase_for_infer.groupby('gene')
+	ase_for_infer_grp = ase_for_infer.groupby('gene')
+
+	record_list = []
 
 	f = open(outfile+'.infer', 'w+')
 	f.write(','.join(cols))
 	f.write('\n')
-	for gene, grp in ase_intersect_grp:
-
+	for gene, sub_intersect in ase_intersect_grp:
 		try: 
-			a_hat, Ia_ub, Ia_lb, b_hat, Ib_ub, Ib_lb = fit_param_betabinom(grp)
-			ase_for_infer = ase_noASE_grp.get_group(gene)
+			a_hat, Ia_ub, Ia_lb, b_hat, Ib_ub, Ib_lb = fit_param_betabinom(sub_intersect)
+			sub_for_infer = ase_for_infer_grp.get_group(gene)
 		except: continue
-		ase_for_infer['maternal_infer'] = ase_for_infer['umi'].astype(int).apply(lambda x: betabinom.rvs(x,a_hat,b_hat))
-		ase_for_infer['paternal_infer'] = ase_for_infer['umi'] - ase_for_infer['maternal_infer']
+		sub_for_infer['maternal_infer'] = sub_for_infer['umi'].astype(int).apply(lambda x: betabinom.rvs(x,a_hat,b_hat))
+		sub_for_infer['paternal_infer'] = sub_for_infer['umi'] - sub_for_infer['maternal_infer']
 
-		ase_intersect_w_infer = pd.concat([ase_for_infer[cols], grp[cols]])
-		record = [gene, len(grp), len(ase_intersect_w_infer), len(grp)/len(ase_intersect_w_infer)]
-		record += [a_hat, Ia_ub, Ia_lb, b_hat, Ib_ub, Ib_lb ]
-		print(','.join(str(x) for x in record))
+		ase_intersect_w_infer = pd.concat([sub_for_infer[cols], sub_intersect[cols]])
 		ase_intersect_w_infer[cols].to_csv(f,header=False,index=False,mode='a')
+
+		record = [gene, len(sub_intersect), len(ase_intersect_w_infer), len(sub_intersect)/len(ase_intersect_w_infer)]
+		record += [a_hat, Ia_lb, Ia_ub, b_hat, Ib_lb, Ib_ub ]
+		record_list.append(record)
+
+	df_record_col = ['gene','nref','nall','percent','a_hat','Ia_lb','Ia_ub','b_hat','Ib_lb','Ib_ub']
+	df_record = pd.DataFrame(data=record_list, columns=df_record_col)
+	df_record.to_csv(outfile+'.record',index=False)
 	f.close()
 
 def ase_compare(ase_org, ase_infer):
@@ -98,8 +104,13 @@ def main():
 	cb_file  = sys.argv[3]
 	prefix   = sys.argv[4]
 
-	umi_raw = dd.read_csv(umi_file,header=0,dtype={'cb':str,'gene':str,'umi':float} )#,compression='gzip')
-	ase_raw = dd.read_csv(ase_file, header=0)
+	if umi_file.endswith('gz'):
+		umi_raw = dd.read_csv(umi_file,header=0,dtype={'cb':str,'gene':str,'umi':float}, compression='gzip')
+	else: umi_raw = dd.read_csv(umi_file,header=0,dtype={'cb':str,'gene':str,'umi':float} )
+
+	if ase_file.endswith('gz'):
+		ase_raw = dd.read_csv(ase_file, header=0, compression='gzip')
+	else: ase_raw = dd.read_csv(ase_file, header=0) 
 
 	# filtered cells 
 	cb_raw = pd.read_csv(cb_file,header=0)
