@@ -8,11 +8,10 @@
 
 method=$2
 sample=$1
-dir=/mnt/pan/Data14/1kgp/NA12878
-#dir=/mnt/pan/Data14/1kgp/${sample}
+dir=/mnt/pan/Data14/1kgp/${sample}
 
 kpe=${dir}/sub_est/${sample}_${method}.est${SLURM_ARRAY_TASK_ID}
-ase=${dir}/sub_ase/${sample}.ase.reform${SLURM_ARRAY_TASK_ID}
+ase=${dir}/${sample}.ase.reform
 
 out_var=${dir}/${sample}_${method}.var${SLURM_ARRAY_TASK_ID} 
 python $HOME/ASE/lib/variance.py ${kpe} ${ase} ${out_var} &

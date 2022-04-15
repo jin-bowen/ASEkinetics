@@ -42,18 +42,27 @@ def fit_param_betabinom(ase):
 
 	return a_hat, Ia_ub, Ia_lb, b_hat, Ib_ub, Ib_lb
 
-def allele_infer(umi, ase, outfile):
+def allele_infer(umi, ase, outfile, min_reads=1):
 
 	ase_all = pd.merge(umi,ase,how='left',on=['cb','gene'])
 	ase_intersect = ase_all.loc[~ase_all.isna().any(axis=1)]
-	ase_for_infer = ase_all.loc[ase_all.isna().any(axis=1)]
+	org_columns = ase_all.columns.tolist() 
 
 	cols = ['cb','gene','maternal_infer','paternal_infer','umi']
 	ase_intersect['maternal_infer'] = ase_intersect['ub_maternal'] * ase_intersect['umi']
 	ase_intersect['maternal_infer'] /= (ase_intersect['ub_maternal'] + ase_intersect['ub_paternal'])
 	ase_intersect['maternal_infer'] = np.ceil(ase_intersect['maternal_infer'])
 	ase_intersect['paternal_infer'] = ase_intersect['umi'] - ase_intersect['maternal_infer']	
-	ase_intersect.to_csv(outfile+'.org',index=False)
+	ase_intersect['ub_mp'] = ase_intersect.apply(lambda x: x.ub_maternal + x.ub_paternal, axis=1)	
+	ase_intersect['ub_mp_bool'] = ase_intersect.apply(lambda x: 1 if x.ub_mp >= x.umi else 0, axis=1)	
+	
+	select_bool = (ase_intersect['ub_maternal']>=min_reads) | (ase_intersect['ub_paternal']>=min_reads)
+	
+	ase_intersect_train = ase_intersect.loc[select_bool]
+	ase_for_infer = ase_all.loc[ase_all.isna().any(axis=1)]
+	ase_for_infer = ase_for_infer.append(ase_intersect.loc[~select_bool],ignore_index=True)
+
+	ase_intersect_train.to_csv(outfile+'.org',index=False)
 
 	ase_intersect_grp = ase_intersect.groupby('gene')
 	ase_for_infer_grp = ase_for_infer.groupby('gene')
@@ -121,9 +130,7 @@ def main():
 	outfile = '%s.ase.class'%(prefix)
 	ase_infer_outfile = '%s.ase'%(prefix)
 
-	min_reads=2
-	ase_filter = ase.loc[(ase['ub_maternal']>=min_reads) | (ase['ub_paternal']>=min_reads)]
-	allele_infer(umi,ase_filter,ase_infer_outfile)
+	allele_infer(umi,ase,ase_infer_outfile)
 
 if __name__ == "__main__":
 	main()

@@ -14,7 +14,7 @@ reads=${dir}/${sample}.mtx
 ase=${dir}/${sample}.ase
 cb=${dir}/${sample}.qc
 
-python -W ignore $HOME/ASE/lib/ase_bn.py ${reads} ${ase} ${cb} ${dir}/${sample} > ${dir}/${sample}.ase.record 
+python -W ignore $HOME/ASE/lib/ase_bn.py ${reads} ${ase} ${cb} ${dir}/${sample}  
 python -W ignore $HOME/ASE/lib/analysis/ase_infer_evaluation.py ${dir}/${sample}.ase.record ${ref} ${dir}/${sample}.qc 
 
 ase_infer=${dir}/${sample}.ase.infer

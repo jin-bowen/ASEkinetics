@@ -139,7 +139,7 @@ def main():
 		upper = kp + '_upper'
 		ci = kp + '_ci' 
 
-		select = (kpe_var[mean] > kpe_var[lower]) & (kpe_var[mean] < kpe_var[upper])
+	
 		kpe_var.loc[select,ci] = ( kpe_var.loc[select,upper] - kpe_var.loc[select,lower] )/ kpe_var.loc[select,mean]
 
 	kpe_var[ci] = kpe_var[ci].transform(np.log2)

@@ -24,6 +24,9 @@ def figure_by_chr(ase_eval,outfile):
 	ax.axhline(y=0.5, c='k', ls='--')
 	sns.violinplot(x="chr", y="m_prob_mean",data=ase_eval_keep,order=order,\
 		height=6, aspect=0.2, linewidth=1,ax=ax)
+	yticks = [ round(x,2) for x in np.arange(0,1.1,0.1) ]
+	ax.set_yticks(yticks)
+	ax.set_yticklabels(yticks)
 
 	ax.set_ylabel('ASE probability of maternal allele')
 	ax.set_xlabel('chromosome')
@@ -57,16 +60,18 @@ def main():
 	ase_eval['qc']   = ase_eval.apply(lambda x: x.a_qc & x.b_qc,axis=1)
 
 	ase_eval['m_prob_mean'] = ase_eval.apply(lambda x: x.a_hat/(x.a_hat+x.b_hat),axis=1)
-	ase_eval['m_prob_var'] = ase_eval.apply(lambda x: 1.0/(x.a_hat+x.b_hat+1.0),axis=1) 
+	ase_eval['m_prob_var']  = ase_eval.apply(lambda x: 1.0/(x.a_hat+x.b_hat+1.0),axis=1) 
 
-	print(ase_eval)
-	print(ase_eval['qc'].sum(), ase_eval['qc'].count())
+	ase_eval['m_prob_mean'] = ase_eval['m_prob_mean'].apply(lambda x: max(min(x,1),0))
+	ase_eval.to_csv(outfile+'.stats',index=False)
 	figure(ase_eval,outfile)
 
 	ref_gene = pd.read_csv(ref_gene_tab, header=0, sep='\t', names=['chr','start','end','gene','score','strand'])
 	ase_eval_chr = pd.merge(ase_eval, ref_gene, on='gene')
+	print(ase_eval_chr['m_prob_mean'].min())
+	print(ase_eval_chr['m_prob_mean'].max())
+
 	figure_by_chr(ase_eval_chr,outfile)
-			
 
 if __name__ == "__main__":
 	main()

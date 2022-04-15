@@ -1,5 +1,5 @@
 from joblib import delayed,Parallel
-from est import full_est,pb_est,gibbs_est
+from lib.est import full_est,pb_est,gibbs_est
 from scipy.stats import poisson,beta,power_divergence,chi2,ks_2samp
 import dask.dataframe as dd
 import pandas as pd
