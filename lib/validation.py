@@ -129,7 +129,6 @@ def main():
 	kpe_eval_all['n'] = kpe_eval_all['kon']/(kpe_eval_all['kon']+kpe_eval_all['koff'])
 	kpe_eval_all['τ']   = 1/(kpe_eval_all['kon']+kpe_eval_all['koff'])
 
-
 	kpe_eval = kpe_eval_all[kpe_eval_all['consist']==1]
 	# filter variance profile
 	kp_cols = ['kon','koff','ksyn']	
@@ -139,7 +138,7 @@ def main():
 		upper = kp + '_upper'
 		ci = kp + '_ci' 
 
-	
+		select = (kpe_var[mean] > kpe_var[lower]) & (kpe_var[mean] < kpe_var[upper])	
 		kpe_var.loc[select,ci] = ( kpe_var.loc[select,upper] - kpe_var.loc[select,lower] )/ kpe_var.loc[select,mean]
 
 	kpe_var[ci] = kpe_var[ci].transform(np.log2)

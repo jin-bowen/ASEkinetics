@@ -7,7 +7,7 @@ import re
 def MergeRecord(df_subset,gene,outfile,phased=True):
 
 	cols = ['cb','gene','pos','allele_ref','ub_ref','allele_alt','ub_alt']
-	if phased: cols += ['ub_maternal','ub_paternal']
+	if phased: cols += ['ub_H1','ub_H2']
 	read_df = pd.DataFrame(columns=cols)
 
 	for irow, row in df_subset.iterrows():
@@ -16,10 +16,10 @@ def MergeRecord(df_subset,gene,outfile,phased=True):
 	read_df_mapped = read_df.loc[read_df['gene']==gene]
 
 	read_df_all = read_df_mapped.groupby(['cb','gene']).agg(
-		ub_m_list=pd.NamedAgg(column='ub_maternal',aggfunc=list),
-		ub_p_list=pd.NamedAgg(column='ub_paternal',aggfunc=list),
-		ub_maternal_count=pd.NamedAgg(column='ub_maternal',aggfunc='nunique'),
-		ub_paternal_count=pd.NamedAgg(column='ub_paternal',aggfunc='nunique'))
+		ub_m_list=pd.NamedAgg(column='ub_H1',aggfunc=list),
+		ub_p_list=pd.NamedAgg(column='ub_H2',aggfunc=list),
+		ub_H1_count=pd.NamedAgg(column='ub_H1',aggfunc='nunique'),
+		ub_H2_count=pd.NamedAgg(column='ub_H2',aggfunc='nunique'))
 	read_df_all.reset_index(inplace=True)
 
 	aberrant_read_list = []	
@@ -34,13 +34,13 @@ def MergeRecord(df_subset,gene,outfile,phased=True):
 			p_ub_count = ub_p_list.count(ub)
 			if m_ub_count!=0 and p_ub_count!=0: aberrant_read_list.append(irow) 
 
-			if m_ub_count > p_ub_count: read_df_all.loc[irow,'ub_paternal_count'] -= 1
-			elif m_ub_count < p_ub_count: read_df_all.loc[irow,'ub_paternal_count'] -= 1
+			if m_ub_count > p_ub_count: read_df_all.loc[irow,'ub_H2_count'] -= 1
+			elif m_ub_count < p_ub_count: read_df_all.loc[irow,'ub_H2_count'] -= 1
 			else: 
-				read_df_all.loc[irow,'ub_maternal_count'] -= 1
-				read_df_all.loc[irow,'ub_paternal_count'] -= 1
+				read_df_all.loc[irow,'ub_H1_count'] -= 1
+				read_df_all.loc[irow,'ub_H2_count'] -= 1
 
-	if len(aberrant_read_list)>0:
+	if len(aberrant_read_list) > 0:
 		read_df_all.loc[aberrant_read_list].to_csv('%s_aberrant_read.csv'%outfile,mode='a')
 
 	return read_df_all
@@ -48,7 +48,7 @@ def MergeRecord(df_subset,gene,outfile,phased=True):
 def PileToRecord(row, phased):
 	cols = ['cb','gene','pos','allele_ref','ub_ref','allele_alt','ub_alt']
 
-	if phased: cols += ['ub_maternal','ub_paternal']
+	if phased: cols += ['ub_H1','ub_H2']
 	read_df = pd.DataFrame(columns=cols)
 
 	chr = row['chr']
@@ -89,14 +89,14 @@ def PileToRecord(row, phased):
 	if phased:
 		genotype =  row['genotype']
 		if genotype == '1|0': 
-			read_df['ub_maternal'] = read_df['ub_alt']
-			read_df['ub_paternal'] = read_df['ub_ref']
+			read_df['ub_H1'] = read_df['ub_alt']
+			read_df['ub_H2'] = read_df['ub_ref']
 		elif genotype == '0|1':
-			read_df['ub_maternal'] = read_df['ub_ref']
-			read_df['ub_paternal'] = read_df['ub_alt']
+			read_df['ub_H1'] = read_df['ub_ref']
+			read_df['ub_H2'] = read_df['ub_alt']
 		else: 
-			read_df['ub_maternal'] = None
-			read_df['ub_paternal'] = None
+			read_df['ub_H1'] = None
+			read_df['ub_H2'] = None
 	return read_df		
 
 def main():
@@ -122,10 +122,20 @@ def main():
 	df_grp = df.groupby('gene')
 	for gene, df_subset in df_grp:
 		temp = MergeRecord(df_subset,gene,outfile,phased=True)
-	
-	ase_df_sum.reset_index(inplace=True)
+		if len(ase_df) <1: ase_df=temp
+		else: ase_df = ase_df.append(temp,ignore_index=True)
+
+#	select_sum = ase_df.apply(lambda x: (x.ub_H1_count + x.ub_H2_count) > 0, axis=1) 
+	ase_df_sum = ase_df[['cb','gene','ub_H1_count','ub_H2_count']].copy()
+	# if H1 and H2 reads == 0
+#	ase_df_sum = ase_df_sum.loc[select_sum]
+
+	ase_df_sum.columns = ['cb','gene','ub_H1','ub_H2']	
 	ase_df_sum.to_csv('%s.ase'%outfile,index=False,mode='w')
 
 if __name__ == "__main__":
 	main()
+
+
+
 

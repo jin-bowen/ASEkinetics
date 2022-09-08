@@ -51,10 +51,10 @@ def process_unphased(df):
 
 def process_phased(df):
 
-	df['maternal_infer'] = np.ceil(df['ub_maternal'] * df['umi']/ (df['ub_maternal'] + df['ub_paternal']))
-	df['paternal_infer'] = df['umi'] - df['maternal_infer']
+	df['H1_infer'] = np.ceil(df['ub_H1'] * df['umi']/ (df['ub_H1'] + df['ub_H2']))
+	df['H2_infer'] = df['umi'] - df['H1_infer']
 
-	df_grp = df.groupby('gene')[['maternal_infer','paternal_infer']]
+	df_grp = df.groupby('gene')[['H1_infer','H2_infer']]
 
 	ncb     = df['cb'].nunique() 
 	cb_list = df['cb'].unique()
@@ -64,17 +64,17 @@ def process_phased(df):
 	processed_df = pd.DataFrame(columns=['gene','allele','cb_umi_list'])
 	for key, group in df_grp:
 		igene = key
-		maternal_val = group['maternal_infer'].tolist()
-		paternal_val = group['paternal_infer'].tolist()
+		H1_val = group['H1_infer'].tolist()
+		H2_val = group['H2_infer'].tolist()
 
 		gcb = group['cb'].tolist()
 		gcb_idx = [ cb_tab[igcb] for igcb in gcb ]
 
-		maternal_cb_umi = list(zip(gcb_idx, maternal_val))	
-		paternal_cb_umi = list(zip(gcb_idx, paternal_val))	
+		H1_cb_umi = list(zip(gcb_idx, H1_val))	
+		H2_cb_umi = list(zip(gcb_idx, H2_val))	
 
-		processed_df.loc[len(processed_df.index)] = [igene, 'maternal_allele', maternal_cb_umi] 
-		processed_df.loc[len(processed_df.index)] = [igene, 'paternal_allele', paternal_cb_umi]
+		processed_df.loc[len(processed_df.index)] = [igene, 'H1_allele', H1_cb_umi] 
+		processed_df.loc[len(processed_df.index)] = [igene, 'H2_allele', H2_cb_umi]
 
 	processed_df['gene_allele'] = processed_df[['gene','allele']].agg('-'.join, axis=1)
 	processed_df.drop(['gene','allele'],axis=1, inplace=True)
@@ -96,7 +96,7 @@ def main():
 	phased     = sys.argv[2]
 	out_prefix = sys.argv[3]
 
-	inferred_allele_df = pd.read_csv(ase_infer,header=0,names=['cb','gene','ub_maternal','ub_paternal','umi'])
+	inferred_allele_df = pd.read_csv(ase_infer,header=0,names=['cb','gene','ub_H1','ub_H2','umi'])
 
 	if phased: sparse_mat, allele_list, cb_list = process_phased(inferred_allele_df)
 	else: sparse_mat, allele_list, cb_list = process_unphased(inferred_allele_df)
